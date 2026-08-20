@@ -224,8 +224,8 @@ a { color: inherit; text-decoration: none; }
 .flow-line.is-active i::after { display: block; animation: packet 1.9s linear infinite; }
 @keyframes packet { 50% { opacity: .35; } }
 .convergence { grid-column: 1 / -1; grid-row: 2; position: relative; inset: auto; width: auto; height: auto; display: flex; align-items: center; justify-content: center; background: none; box-shadow: none; }
-.convergence::before { content: ""; position: absolute; inset: auto 0; height: 1px; width: auto; transform: none; rotate: 0deg; background: rgba(255,255,255,.13); }
-.convergence::after { content: ""; position: absolute; width: 1px; height: 100%; left: 50%; top: 0; transform: none; rotate: 0deg; background: rgba(255,255,255,.13); }
+.convergence::before { content: ""; position: absolute; inset: auto 0; height: 1px; width: auto; transform: none; rotate: 0deg; background: linear-gradient(90deg, transparent, rgba(171,121,255,.24), transparent); }
+.convergence::after { content: ""; position: absolute; width: 1px; height: 100%; left: 50%; top: 0; transform: none; rotate: 0deg; background: linear-gradient(0deg, transparent, rgba(171,121,255,.24), transparent); }
 .convergence i { position: relative; left: auto; bottom: auto; margin: 0 5px; z-index: 1; background: #3f4751; }
 .convergence.is-active { background: none; box-shadow: none; }.convergence.is-active::before, .convergence.is-active::after { background: linear-gradient(90deg, transparent, rgba(171,121,255,.85), transparent); box-shadow: 0 0 13px rgba(171,121,255,.45); }.convergence.is-active::after { background: linear-gradient(0deg, transparent, rgba(171,121,255,.85), transparent); }.convergence.is-active i { background: var(--violet); box-shadow: 0 0 12px var(--violet); }
 .signal-bars i { animation: signal-bar 1.7s ease-in-out infinite alternate; }.signal-bars i:nth-child(2) { animation-delay: -.3s; }.signal-bars i:nth-child(3) { animation-delay: -.6s; }.signal-bars i:nth-child(4) { animation-delay: -.8s; }.signal-bars i:nth-child(5) { animation-delay: -1s; }.signal-bars i:nth-child(6) { animation-delay: -1.3s; }
