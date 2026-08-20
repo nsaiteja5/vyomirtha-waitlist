@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { getFoundingAccess, joinWaitlist, sendContact, subscribeToFoundingAccess } from './api.js'
+import xLogo from '../x.png'
 
 const stages = [
   { number: '01', label: 'Define your ICP', detail: 'B2B SaaS · 10–50 people · US / EU', type: 'profile' },
@@ -46,7 +47,7 @@ function Arrow() {
 }
 
 function XLogo({ className = 'x-logo' }) {
-  return <img className={className} src="/x.png" alt="X" />
+  return <img className={className} src={xLogo} alt="X" />
 }
 
 function useFoundingAccess() {
