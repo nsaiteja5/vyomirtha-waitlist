@@ -212,7 +212,8 @@ a { color: inherit; text-decoration: none; }
 .node--icp { grid-column: 1; grid-row: 1; }
 .node--signals { grid-column: 3; grid-row: 1; }
 .node--history { grid-column: 5; grid-row: 1; }
-.node--accounts { grid-column: 1; grid-row: 3; }
+/* Keep this explicit: production CSS optimization removes the generic translate reset. */
+.node--accounts { grid-column: 1; grid-row: 3; translate: 0; }
 .node--timeline { grid-column: 3; grid-row: 3; }
 .opportunity { grid-column: 5; grid-row: 3; align-self: center; }
 .flow-line { position: relative; inset: auto; width: 100%; height: 1px; align-self: center; background: rgba(255,255,255,.13); overflow: visible; z-index: 0; }
