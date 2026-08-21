@@ -366,7 +366,7 @@ function Access() {
             <div className="seat-meter" aria-label={totalSeats ? `${claimedSeats} of ${totalSeats} founding seats claimed` : 'Founding seat availability unavailable'}><i style={{ '--seats-claimed': totalSeats ? `${claimedSeats / totalSeats * 100}%` : '0%' }} /></div>
           </div>
           <h3>{soldOut ? <>{publicPrice}<br />public access.</> : <>{foundingPrice}, locked<br />for life.</>}</h3>
-          <div className="founding-price"><strong>{soldOut ? 'First cohort complete' : publicPrice}</strong><span>{soldOut ? `All ${totalSeats} founding seats are claimed` : 'after founding access closes'}</span></div>
+          <div className="founding-price"><strong>{soldOut ? 'First batch complete' : publicPrice}</strong><span>{soldOut ? `All ${totalSeats} founding seats are claimed` : 'after founding access closes'}</span></div>
           <p className="founder-advantage"><b>{soldOut ? 'The founding rate is now closed.' : 'Save $240/year permanently.'}</b><span>{soldOut ? 'Join the free waitlist to hear when public access opens.' : `Founding access closes permanently when all ${totalSeats ?? 'available'} seats are claimed.`}</span></p>
           <ul className="plan-list">
             <li><b>60 qualified leads / month — 4× Free capacity</b></li>
@@ -501,7 +501,7 @@ function Confirmation({ type, email, status, seat, paidAt, receiptEmail }) {
           <p className="eyebrow">Access status</p>
           <h1 id="confirmation-title">You’re already in.</h1>
           <p className="confirmation-copy">{founding ? 'Your Founding Access is secured at $29/mo for life.' : 'Your waitlist place is confirmed. We’ll notify you when your access is ready.'}</p>
-          <div className="confirmation-status-row"><span>{founding ? `COHORT 01 / SEAT #${seatLabel}` : 'WAITLIST STATUS'}</span><b>{founding ? 'FOUNDING ACCESS SECURED' : 'EARLY ACCESS QUEUED'}</b></div>
+          <div className="confirmation-status-row"><span>{founding ? `FOUNDING BATCH / SEAT #${seatLabel}` : 'WAITLIST STATUS'}</span><b>{founding ? 'FOUNDING ACCESS SECURED' : 'EARLY ACCESS QUEUED'}</b></div>
           {email && <p className="submitted-email">Registered to <b>{email}</b></p>}
           <a className="button button--outline confirmation-return" href="#/">Back to VYOMIRTHA <Arrow /></a>
         </section>
@@ -534,7 +534,7 @@ function Confirmation({ type, email, status, seat, paidAt, receiptEmail }) {
           <div className="credential" aria-label="Founding Access request credential">
             <span className="credential-spark" aria-hidden="true">✦</span>
             <div className="credential-top"><span>FOUNDING ACCESS</span><span>REQUEST RECEIVED</span></div>
-            <strong>01<i>/ FIRST COHORT</i></strong>
+            <strong>#{seatLabel}<i>/ FOUNDING BATCH</i></strong>
             <p>VYOMIRTHA · ACCESS REQUEST</p>
           </div>
           <p className="eyebrow"><i /> Founding access request</p>
@@ -557,11 +557,11 @@ function Confirmation({ type, email, status, seat, paidAt, receiptEmail }) {
       <section className="confirmation-panel confirmation-panel--founding" aria-labelledby="confirmation-title">
         <div className="credential" aria-label={`Founding member credential, seat ${seatLabel} of ${totalSeatsLabel}`}>
           <span className="credential-spark" aria-hidden="true">✦</span>
-          <div className="credential-top"><span>FOUNDING MEMBER</span><span>COHORT 01</span></div>
+          <div className="credential-top"><span>FOUNDING MEMBER</span><span>FOUNDING BATCH</span></div>
           <strong>#{seatLabel}<i>/ {totalSeatsLabel}</i></strong>
           <p>VYOMIRTHA · FOUNDING ACCESS</p>
         </div>
-        <p className="eyebrow"><i /> Founding access · Cohort 01 / seat #{seatLabel}</p>
+        <p className="eyebrow"><i /> Founding access · Founding Batch / seat #{seatLabel}</p>
         <h1 id="confirmation-title">Founding access<br />secured.</h1>
         <p className="confirmation-copy">Your $29/mo Founding rate is locked for life. Your seat is reserved for the first release.</p>
         <div className="credential-details">
