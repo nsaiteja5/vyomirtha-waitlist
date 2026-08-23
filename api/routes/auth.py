@@ -32,11 +32,26 @@ def get_env_config():
     }
 
 
+def get_request_app_url(request: Request, default_url: str) -> str:
+    """Extract origin protocol + host from incoming request headers."""
+    forwarded_host = request.headers.get("x-forwarded-host")
+    forwarded_proto = request.headers.get("x-forwarded-proto") or "https"
+    host = request.headers.get("host")
+
+    active_host = forwarded_host or host
+    if active_host:
+        if "localhost" in active_host or "127.0.0.1" in active_host:
+            proto = "http" if not forwarded_proto or forwarded_proto == "http" else forwarded_proto
+            return f"{proto}://{active_host}".rstrip("/")
+        return f"{forwarded_proto}://{active_host}".rstrip("/")
+    return default_url.rstrip("/")
+
+
 @router.get("/x")
-async def x_login():
+async def x_login(request: Request):
     """Redirect user to X authorization page (or simulate login if TEST_ENV is true)."""
     cfg = get_env_config()
-    app_url = cfg["APP_URL"]
+    app_url = get_request_app_url(request, cfg["APP_URL"])
     jwt_secret = cfg["JWT_SECRET"]
 
     # TEST_ENV simulation
@@ -83,11 +98,26 @@ async def x_login():
 
     client_id = cfg["X_CLIENT_ID"]
     if not client_id:
-        print("[X Auth Warning] X_CLIENT_ID is not configured in .env file!")
+        print("[X Auth Warning] X_CLIENT_ID is not configured in environment!")
 
     code_verifier = secrets.token_urlsafe(64)
     state = secrets.token_urlsafe(32)
+    redirect_uri = f"{app_url}/api/auth/x/callback"
+
+    # Store in-memory and in Firebase RTDB for cross-instance serverless resilience
     _pkce_store[state] = code_verifier
+    try:
+        await db.patch(
+            f"leaderboard/pkce_sessions/{state}",
+            {
+                "code_verifier": code_verifier,
+                "app_url": app_url,
+                "redirect_uri": redirect_uri,
+                "created_at": int(time.time()),
+            },
+        )
+    except Exception as e:
+        print(f"[X Auth Warning] Failed to persist PKCE session: {e}")
 
     code_challenge = (
         base64.urlsafe_b64encode(
@@ -97,8 +127,7 @@ async def x_login():
         .decode()
     )
 
-    redirect_uri = f"{app_url}/api/auth/x/callback"
-    print(f"[X Auth] Initiating OAuth 2.0 flow: redirect_uri={redirect_uri}, client_id={client_id[:8]}***")
+    print(f"[X Auth] Initiating OAuth 2.0 flow: redirect_uri={redirect_uri}, client_id={client_id[:8] if client_id else 'NONE'}***")
     params = (
         f"response_type=code"
         f"&client_id={client_id}"
@@ -112,12 +141,12 @@ async def x_login():
 
 
 @router.get("/x/callback")
-async def x_callback(code: str = "", state: str = "", error: str = ""):
+async def x_callback(request: Request, code: str = "", state: str = "", error: str = ""):
     """Handle X OAuth callback, exchange code for tokens, create session."""
     cfg = get_env_config()
     client_id = cfg["X_CLIENT_ID"]
     client_secret = cfg["X_CLIENT_SECRET"]
-    app_url = cfg["APP_URL"]
+    app_url = get_request_app_url(request, cfg["APP_URL"])
     jwt_secret = cfg["JWT_SECRET"]
 
     if error or not code:
@@ -126,14 +155,28 @@ async def x_callback(code: str = "", state: str = "", error: str = ""):
             f"{app_url}/leaderboard?auth_error={error or 'denied'}"
         )
 
+    # 1. Retrieve PKCE session from in-memory or Firebase RTDB (cross-serverless)
     code_verifier = _pkce_store.pop(state, None)
+    redirect_uri = f"{app_url}/api/auth/x/callback"
+
+    try:
+        session_data = await db.get(f"leaderboard/pkce_sessions/{state}")
+        if session_data:
+            await db.delete(f"leaderboard/pkce_sessions/{state}")
+            if not code_verifier:
+                code_verifier = session_data.get("code_verifier")
+            if session_data.get("redirect_uri"):
+                redirect_uri = session_data.get("redirect_uri")
+            if session_data.get("app_url"):
+                app_url = session_data.get("app_url")
+    except Exception as e:
+        print(f"[X Auth Warning] Failed to fetch PKCE session: {e}")
+
     if not code_verifier:
         print("[X Auth Error] Invalid PKCE state or session expired.")
         return RedirectResponse(
             f"{app_url}/leaderboard?auth_error=invalid_state"
         )
-
-    redirect_uri = f"{app_url}/api/auth/x/callback"
 
     # Exchange authorization code for access token
     post_data = {
