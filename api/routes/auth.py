@@ -47,6 +47,8 @@ def get_request_app_url(request: Request, default_url: str) -> str:
     return default_url.rstrip("/")
 
 
+import urllib.parse
+
 @router.get("/x")
 async def x_login(request: Request):
     """Redirect user to X authorization page (or simulate login if TEST_ENV is true)."""
@@ -96,9 +98,10 @@ async def x_login(request: Request):
 
         return RedirectResponse(f"{app_url}/leaderboard?xtoken={token}")
 
-    client_id = cfg["X_CLIENT_ID"]
+    client_id = cfg["X_CLIENT_ID"].strip().strip("'\"")
     if not client_id:
-        print("[X Auth Warning] X_CLIENT_ID is not configured in environment!")
+        print("[X Auth Error] X_CLIENT_ID is not configured in server environment!")
+        return RedirectResponse(f"{app_url}/leaderboard?auth_error=missing_client_id")
 
     code_verifier = secrets.token_urlsafe(64)
     state = secrets.token_urlsafe(32)
@@ -127,17 +130,19 @@ async def x_login(request: Request):
         .decode()
     )
 
-    print(f"[X Auth] Initiating OAuth 2.0 flow: redirect_uri={redirect_uri}, client_id={client_id[:8] if client_id else 'NONE'}***")
-    params = (
-        f"response_type=code"
-        f"&client_id={client_id}"
-        f"&redirect_uri={redirect_uri}"
-        f"&scope=tweet.read%20users.read"
-        f"&state={state}"
-        f"&code_challenge={code_challenge}"
-        f"&code_challenge_method=S256"
-    )
-    return RedirectResponse(f"https://twitter.com/i/oauth2/authorize?{params}")
+    print(f"[X Auth] Initiating OAuth 2.0 flow: redirect_uri={redirect_uri}, client_id={client_id[:8]}***")
+    
+    oauth_params = {
+        "response_type": "code",
+        "client_id": client_id,
+        "redirect_uri": redirect_uri,
+        "scope": "tweet.read users.read",
+        "state": state,
+        "code_challenge": code_challenge,
+        "code_challenge_method": "s256",
+    }
+    encoded_query = urllib.parse.urlencode(oauth_params, quote_via=urllib.parse.quote)
+    return RedirectResponse(f"https://twitter.com/i/oauth2/authorize?{encoded_query}")
 
 
 @router.get("/x/callback")

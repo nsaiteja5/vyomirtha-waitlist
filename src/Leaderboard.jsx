@@ -292,6 +292,7 @@ function useXAuth() {
         token_failed: 'Failed to exchange authorization token with X API.',
         no_token: 'No access token received from X.',
         profile_failed: 'Failed to fetch user profile from X.',
+        missing_client_id: 'X_CLIENT_ID is not configured in Vercel Environment Variables. Please add it in project settings.',
       }
       setAuthError(messages[errCode] || `X authentication error: ${errCode}`)
       try {
