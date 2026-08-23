@@ -160,133 +160,142 @@ async def x_callback(request: Request, code: str = "", state: str = "", error: s
             f"{app_url}/leaderboard?auth_error={error or 'denied'}"
         )
 
-    # 1. Retrieve PKCE session from in-memory or Firebase RTDB (cross-serverless)
-    code_verifier = _pkce_store.pop(state, None)
-    redirect_uri = f"{app_url}/api/auth/x/callback"
-
     try:
-        session_data = await db.get(f"leaderboard/pkce_sessions/{state}")
-        if session_data:
-            await db.delete(f"leaderboard/pkce_sessions/{state}")
-            if not code_verifier:
-                code_verifier = session_data.get("code_verifier")
-            if session_data.get("redirect_uri"):
-                redirect_uri = session_data.get("redirect_uri")
-            if session_data.get("app_url"):
-                app_url = session_data.get("app_url")
-    except Exception as e:
-        print(f"[X Auth Warning] Failed to fetch PKCE session: {e}")
+        # 1. Retrieve PKCE session from in-memory or Firebase RTDB (cross-serverless)
+        code_verifier = _pkce_store.pop(state, None)
+        redirect_uri = f"{app_url}/api/auth/x/callback"
 
-    if not code_verifier:
-        print("[X Auth Error] Invalid PKCE state or session expired.")
-        return RedirectResponse(
-            f"{app_url}/leaderboard?auth_error=invalid_state"
-        )
+        try:
+            session_data = await db.get(f"leaderboard/pkce_sessions/{state}")
+            if session_data:
+                await db.delete(f"leaderboard/pkce_sessions/{state}")
+                if not code_verifier:
+                    code_verifier = session_data.get("code_verifier")
+                if session_data.get("redirect_uri"):
+                    redirect_uri = session_data.get("redirect_uri")
+                if session_data.get("app_url"):
+                    app_url = session_data.get("app_url")
+        except Exception as e:
+            print(f"[X Auth Warning] Failed to fetch PKCE session: {e}")
 
-    # Exchange authorization code for access token
-    post_data = {
-        "code": code,
-        "grant_type": "authorization_code",
-        "client_id": client_id,
-        "redirect_uri": redirect_uri,
-        "code_verifier": code_verifier,
-    }
-
-    req_kwargs = {
-        "data": post_data,
-        "headers": {"Content-Type": "application/x-www-form-urlencoded"},
-    }
-
-    # If secret is present, include Basic Auth header (Confidential Client)
-    if client_secret:
-        req_kwargs["auth"] = (client_id, client_secret)
-
-    async with httpx.AsyncClient() as client:
-        token_resp = await client.post(
-            "https://api.twitter.com/2/oauth2/token",
-            **req_kwargs
-        )
-
-        if token_resp.status_code != 200:
-            print(f"[X Auth Error] Token exchange failed ({token_resp.status_code}): {token_resp.text}")
+        if not code_verifier:
+            print("[X Auth Error] Invalid PKCE state or session expired.")
             return RedirectResponse(
-                f"{app_url}/leaderboard?auth_error=token_failed"
+                f"{app_url}/leaderboard?auth_error=invalid_state"
             )
 
-        tokens = token_resp.json()
-        access_token = tokens.get("access_token")
-        if not access_token:
-            print("[X Auth Error] No access token in response:", tokens)
-            return RedirectResponse(
-                f"{app_url}/leaderboard?auth_error=no_token"
+        # Exchange authorization code for access token
+        post_data = {
+            "code": code,
+            "grant_type": "authorization_code",
+            "client_id": client_id,
+            "redirect_uri": redirect_uri,
+            "code_verifier": code_verifier,
+        }
+
+        req_kwargs = {
+            "data": post_data,
+            "headers": {"Content-Type": "application/x-www-form-urlencoded"},
+        }
+
+        # If secret is present, include Basic Auth header (Confidential Client)
+        if client_secret:
+            req_kwargs["auth"] = (client_id, client_secret)
+
+        async with httpx.AsyncClient() as client:
+            token_resp = await client.post(
+                "https://api.twitter.com/2/oauth2/token",
+                **req_kwargs
             )
 
-        # Fetch user profile from X
-        user_resp = await client.get(
-            "https://api.twitter.com/2/users/me"
-            "?user.fields=profile_image_url,name,username,description",
-            headers={"Authorization": f"Bearer {access_token}"},
+            if token_resp.status_code != 200:
+                print(f"[X Auth Error] Token exchange failed ({token_resp.status_code}): {token_resp.text}")
+                return RedirectResponse(
+                    f"{app_url}/leaderboard?auth_error=token_failed"
+                )
+
+            tokens = token_resp.json()
+            access_token = tokens.get("access_token")
+            if not access_token:
+                print("[X Auth Error] No access token in response:", tokens)
+                return RedirectResponse(
+                    f"{app_url}/leaderboard?auth_error=no_token"
+                )
+
+            # Fetch user profile from X
+            user_resp = await client.get(
+                "https://api.twitter.com/2/users/me"
+                "?user.fields=profile_image_url,name,username,description",
+                headers={"Authorization": f"Bearer {access_token}"},
+            )
+
+            if user_resp.status_code != 200:
+                print(f"[X Auth Error] Fetching profile failed ({user_resp.status_code}): {user_resp.text}")
+                return RedirectResponse(
+                    f"{app_url}/leaderboard?auth_error=profile_failed"
+                )
+
+            user_data = user_resp.json().get("data", {})
+
+        x_id = user_data.get("id", "")
+        name = user_data.get("name", "")
+        handle = user_data.get("username", "")
+        avatar = (
+            user_data.get("profile_image_url", "")
+            .replace("_normal", "_400x400")
         )
+        bio = user_data.get("description", "")
 
-        if user_resp.status_code != 200:
-            print(f"[X Auth Error] Fetching profile failed ({user_resp.status_code}): {user_resp.text}")
-            return RedirectResponse(
-                f"{app_url}/leaderboard?auth_error=profile_failed"
-            )
+        # Store / update user profile in Firebase
+        now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        existing = await db.get(f"leaderboard/users/{x_id}")
 
-        user_data = user_resp.json().get("data", {})
-
-    x_id = user_data.get("id", "")
-    name = user_data.get("name", "")
-    handle = user_data.get("username", "")
-    avatar = (
-        user_data.get("profile_image_url", "")
-        .replace("_normal", "_400x400")
-    )
-    bio = user_data.get("description", "")
-
-    # Store / update user profile in Firebase
-    now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-    profile_data = {
-        "name": name,
-        "handle": handle,
-        "avatar": avatar,
-        "updatedAt": now,
-    }
-    if not existing or not isinstance(existing, dict):
-        profile_data["bio"] = bio
-        profile_data["state"] = ""
-        profile_data["language"] = ""
-        profile_data["motto"] = ""
-        profile_data["projects"] = []
-        profile_data["achievement"] = ""
-        profile_data["flex"] = ""
-        profile_data["title"] = ""
-        profile_data["links"] = {"website": "", "github": "", "linkedin": ""}
-        profile_data["phone"] = ""
-        profile_data["balance"] = 0
-        profile_data["position"] = None
-        profile_data["paymentCount"] = 0
-        profile_data["lastPaidAmount"] = 0
-        profile_data["lastPaidAt"] = ""
-        profile_data["createdAt"] = now
-
-    await db.patch(f"leaderboard/users/{x_id}", profile_data)
-
-    # Create JWT session token (30 days)
-    token = jwt.encode(
-        {
-            "sub": x_id,
+        profile_data = {
             "name": name,
             "handle": handle,
             "avatar": avatar,
-            "exp": int(time.time()) + 86400 * 30,
-        },
-        jwt_secret,
-        algorithm="HS256",
-    )
+            "updatedAt": now,
+        }
+        if not existing or not isinstance(existing, dict):
+            profile_data["bio"] = bio
+            profile_data["state"] = ""
+            profile_data["language"] = ""
+            profile_data["motto"] = ""
+            profile_data["projects"] = []
+            profile_data["achievement"] = ""
+            profile_data["flex"] = ""
+            profile_data["title"] = ""
+            profile_data["links"] = {"website": "", "github": "", "linkedin": ""}
+            profile_data["phone"] = ""
+            profile_data["balance"] = 0
+            profile_data["position"] = None
+            profile_data["paymentCount"] = 0
+            profile_data["lastPaidAmount"] = 0
+            profile_data["lastPaidAt"] = ""
+            profile_data["createdAt"] = now
 
-    return RedirectResponse(f"{app_url}/leaderboard?xtoken={token}")
+        await db.patch(f"leaderboard/users/{x_id}", profile_data)
+
+        # Create JWT session token (30 days)
+        token = jwt.encode(
+            {
+                "sub": x_id,
+                "name": name,
+                "handle": handle,
+                "avatar": avatar,
+                "exp": int(time.time()) + 86400 * 30,
+            },
+            jwt_secret,
+            algorithm="HS256",
+        )
+
+        return RedirectResponse(f"{app_url}/leaderboard?xtoken={token}")
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        err_msg = urllib.parse.quote(str(e))
+        return RedirectResponse(f"{app_url}/leaderboard?auth_error={err_msg}")
 
 
 @router.get("/me")

@@ -154,6 +154,59 @@ const PROUD_VICTORY_COPY = [
   "👑 RANK #{pos} IS YOURS. YOU BACKED YOUR AMBITION WITH REAL PROOF.",
 ]
 
+const SAVAGE_LOADER_MSGS = [
+  "Scanning India's builder hierarchy...",
+  "Calculating who has the most conviction...",
+  "Checking who just got outranked...",
+  "Synchronizing live arena stakes in real-time...",
+  "Loading proof of work. Pure merit, zero nepotism.",
+  "Hold on. Someone is currently fighting for #1...",
+  "Loading live bids across 28 states & 8 UTs...",
+  "Fetching proof of work from India's top shippers...",
+]
+
+function LeaderboardLoader() {
+  const [msgIdx, setMsgIdx] = useState(0)
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setMsgIdx((prev) => (prev + 1) % SAVAGE_LOADER_MSGS.length)
+    }, 2000)
+    return () => clearInterval(timer)
+  }, [])
+
+  return (
+    <div className="lb-loader-backdrop" role="status" aria-live="polite">
+      <div className="lb-loader-card">
+        <div className="lb-loader-orb-wrap">
+          <div className="lb-loader-radar-ring" />
+          <div className="lb-loader-radar-ring lb-loader-radar-ring--2" />
+          <div className="lb-loader-emblem">
+            <IndianFlag width={34} height={23} />
+          </div>
+        </div>
+
+        <div className="lb-loader-brand">
+          <span>VYOMIRTHA <i className="lb-brand-tag">ARENA</i></span>
+        </div>
+
+        <div className="lb-loader-savage-box">
+          <span className="lb-loader-icon">⚔️</span>
+          <p className="lb-loader-msg" key={msgIdx}>
+            {SAVAGE_LOADER_MSGS[msgIdx]}
+          </p>
+        </div>
+
+        <div className="lb-loader-bar">
+          <div className="lb-loader-bar-fill" />
+        </div>
+
+        <span className="lb-loader-sub">PULLING LIVE HIERARCHY FROM FIREBASE</span>
+      </div>
+    </div>
+  )
+}
+
 /* ═══════════════════════════════════════
    UTILITY HELPERS
    ═══════════════════════════════════════ */
@@ -489,12 +542,12 @@ function LiveArenaStrip({ entries, events, onOpenModal }) {
 
   const displayEvents = useMemo(() => {
     if (events && events.length > 0) {
-      return events.slice(0, 10).map((ev) => ({
+      return events.slice(0, 15).map((ev) => ({
         id: ev.id || `${ev.userId}-${ev.timestamp}`,
         userHandle: ev.userHandle || ev.userName || 'builder',
         type: ev.type || 'claim',
         position: ev.position || 1,
-        amount: ev.newBalance || ev.amount || 10,
+        amount: ev.newBalance || ev.amount || 1,
         timeStr: timeAgo(ev.timestamp),
       }))
     }
@@ -507,6 +560,15 @@ function LiveArenaStrip({ entries, events, onOpenModal }) {
       timeStr: timeAgo(e.lastPaidAt),
     }))
   }, [events, entries])
+
+  const tickerList = useMemo(() => {
+    if (!displayEvents.length) return []
+    let list = [...displayEvents]
+    while (list.length < 8) {
+      list = list.concat(displayEvents)
+    }
+    return list.concat(list)
+  }, [displayEvents])
 
   return (
     <div className="lb-proof-strip">
@@ -528,7 +590,7 @@ function LiveArenaStrip({ entries, events, onOpenModal }) {
         {/* Live Battle Feed Marquee */}
         <div className="lb-ticker-wrap">
           <div className="lb-ticker-track">
-            {displayEvents.concat(displayEvents).map((item, idx) => (
+            {tickerList.map((item, idx) => (
               <div className="lb-ticker-item" key={`${item.id}-${idx}`}>
                 <span className={`lb-ticker-badge lb-ticker-badge--${item.type}`}>
                   {item.type === 'reclaim' ? '🔥 OUTBID' : item.type === 'topup' ? '⚡ BOOST' : '⚔️ ENTERED'}
@@ -1429,27 +1491,29 @@ function LeaderboardBoard({ entries, flashed, onTakeSpot, onSelectBuilder }) {
 
 function LiveActivity({ events, entries }) {
   const displayList = useMemo(() => {
-    if (events && events.length > 0) return events.slice(0, 15)
-    return entries.slice(0, 5).map((e) => ({
+    if (events && events.length > 0) return events.slice(0, 20)
+    return entries.slice(0, 10).map((e) => ({
       id: e.id,
       userHandle: e.handle || e.name,
       userName: e.name,
       type: e.position === 1 ? 'reclaim' : 'claim',
       position: e.position,
       newBalance: e.balance,
+      amount: e.balance,
       timeStr: timeAgo(e.lastPaidAt),
+      timestamp: e.lastPaidAt,
     }))
   }, [events, entries])
 
   return (
-    <section className="lb-activity">
+    <section className="lb-activity" id="battle-log">
       <div className="lb-section-shell">
         <div className="lb-activity-header">
           <div className="lb-activity-title">
             <span className="lb-live-dot" />
             <h3>ARENA BATTLE LOG <IndianFlag width={18} height={12} /></h3>
           </div>
-          <span className="lb-activity-badge">LIVE EVENT STREAM</span>
+          <span className="lb-activity-badge">LIVE EVENT STREAM ({displayList.length})</span>
         </div>
 
         <div className="lb-activity-list">
@@ -1467,7 +1531,7 @@ function LiveActivity({ events, entries }) {
                 {(!event.type || event.type === 'claim') && 'secured position'}
               </span>
               <strong className="lb-activity-rank">#{String(event.position).padStart(2, '0')}</strong>
-              <span className="lb-activity-amount">· {formatAmount(event.newBalance || event.amount || 10)}</span>
+              <span className="lb-activity-amount">· {formatAmount(event.newBalance || event.amount || 1)}</span>
               <span className="lb-activity-time">{event.timeStr || timeAgo(event.timestamp)}</span>
             </div>
           ))}
@@ -2360,6 +2424,9 @@ export default function LeaderboardPage() {
 
   return (
     <div className="lb-page">
+      {/* Subtle Savage Blur Loading Screen until Firebase data resolves */}
+      {loading && <LeaderboardLoader />}
+
       {/* Top Header */}
       <LeaderboardHeader user={user} onLogin={login} onLogout={logout} />
 
