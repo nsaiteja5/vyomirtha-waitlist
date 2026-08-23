@@ -1,94 +1,49 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { getFoundingAccess, joinWaitlist, sendContact, subscribeToFoundingAccess } from './api.js'
 import xLogo from '../x.png'
+import LeaderboardPage, { IndianFlag } from './Leaderboard.jsx'
 
-const stages = [
-  { number: '01', label: 'Define your ICP', detail: 'B2B SaaS · 10–50 people · US / EU', type: 'profile' },
-  { number: '02', label: 'Listen for relevant posts', detail: '12,481 posts matching your ICP', type: 'stream' },
-  { number: '03', label: 'Add account history', detail: 'Historical behavior adds context', type: 'history' },
-  { number: '04', label: 'Find matching accounts', detail: '1,284 accounts match your ICP', type: 'accounts' },
-  { number: '05', label: 'Understand current state', detail: 'One account, across time', type: 'timeline' },
-  { number: '06', label: 'Flag potential buyers', detail: 'Accounts with a problem you can solve.', type: 'priority' },
-]
-
-const fragments = [
-  { id: 'a', name: 'Mira Chen', handle: '@mirafromops', time: '18m', copy: 'Has anyone moved away from Mixpanel lately?', stats: ['3', '11', '29'], depth: 'far' },
-  { id: 'b', name: 'Leo Hart', handle: '@leohart', time: '31m', copy: 'Pricing is getting harder to justify as the team grows.', stats: ['6', '14', '47'], depth: 'mid' },
-  { id: 'c', name: 'Aisha Khan', handle: '@aishak', time: '44m', copy: 'Looking for a recommendation from teams at our stage.', stats: ['2', '8', '28'], depth: 'near' },
-  { id: 'd', name: 'Ravi Mehta', handle: '@ravimehta', time: '1h', copy: 'Revisiting the analytics stack before our next planning cycle.', stats: ['1', '7', '18'], depth: 'far' },
-  { id: 'e', name: 'Sarah White', handle: '@sarahw', time: '2h', copy: 'Does anyone have experience migrating without losing history?', stats: ['4', '12', '33'], depth: 'mid' },
-  { id: 'f', name: 'Product notes', handle: '@notesbyjo', time: '3h', copy: 'The reporting workflow is the real issue—not the dashboard.', stats: ['5', '15', '41'], depth: 'far' },
-]
-
-const gridColumns = 16
-const gridRows = 10
-
-function baselineRow(row) {
-  return `M 0 ${(row / (gridRows - 1) * 100).toFixed(2)} L 100 ${(row / (gridRows - 1) * 100).toFixed(2)}`
-}
-
-function baselineColumn(column) {
-  return `M ${(column / (gridColumns - 1) * 100).toFixed(2)} 0 L ${(column / (gridColumns - 1) * 100).toFixed(2)} 100`
-}
-
-function HeroGrid() {
-  return (
-    <svg className="hero-grid" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-      <g>
-        {Array.from({ length: gridRows }, (_, row) => <path data-grid-row={row} d={baselineRow(row)} key={`r${row}`} />)}
-        {Array.from({ length: gridColumns }, (_, column) => <path data-grid-column={column} d={baselineColumn(column)} key={`c${column}`} />)}
-      </g>
-    </svg>
-  )
-}
-
-function Arrow() {
-  return <span aria-hidden="true" className="arrow">↗</span>
-}
-
-function XLogo({ className = 'x-logo' }) {
-  return <img className={className} src={xLogo} alt="X" />
-}
-
-function useFoundingAccess() {
-  const [access, setAccess] = useState({ loading: true, data: null })
-
-  useEffect(() => {
-    let mounted = true
-    const update = (data) => {
-      if (mounted) setAccess({ loading: false, data })
-    }
-    const unavailable = () => {
-      if (mounted) setAccess((current) => ({ ...current, loading: false }))
-    }
-
-    getFoundingAccess().then(update).catch(unavailable)
-    const unsubscribe = subscribeToFoundingAccess(update, unavailable)
-    return () => {
-      mounted = false
-      unsubscribe()
-    }
-  }, [])
-
-  return access
-}
-
-function navigate(to) {
-  window.location.hash = to
+export function navigate(to) {
+  if (to.startsWith('/')) {
+    window.history.pushState({}, '', to)
+    window.dispatchEvent(new Event('popstate'))
+  } else if (to.startsWith('#/')) {
+    const path = to.slice(1)
+    window.history.pushState({}, '', path)
+    window.dispatchEvent(new Event('popstate'))
+  } else {
+    window.location.hash = to
+  }
   window.scrollTo({ top: 0, behavior: 'auto' })
 }
 
+function getActiveRoute() {
+  const pathname = window.location.pathname
+  const search = window.location.search
+  const hash = window.location.hash
+
+  if (hash.startsWith('#/')) {
+    const [hPath, hQuery = ''] = hash.slice(1).split('?')
+    return { path: hPath || '/', query: hQuery || search.slice(1) }
+  }
+
+  return { path: pathname || '/', query: search.slice(1) }
+}
+
 function useRoute() {
-  const [route, setRoute] = useState(() => window.location.hash || '#/')
+  const [routeInfo, setRouteInfo] = useState(getActiveRoute)
 
   useEffect(() => {
-    const change = () => setRoute(window.location.hash || '#/')
+    const change = () => setRouteInfo(getActiveRoute())
+    window.addEventListener('popstate', change)
     window.addEventListener('hashchange', change)
-    return () => window.removeEventListener('hashchange', change)
+    return () => {
+      window.removeEventListener('popstate', change)
+      window.removeEventListener('hashchange', change)
+    }
   }, [])
 
-  const [path, query = ''] = route.slice(1).split('?')
-  return { path: path || '/', params: new URLSearchParams(query) }
+  return { path: routeInfo.path, params: new URLSearchParams(routeInfo.query) }
 }
 
 function Header() {
@@ -113,15 +68,46 @@ function Header() {
 
   return (
     <header className={`site-header ${compact ? 'is-compact' : ''}`}>
-      <a className="brand" href="#/" aria-label="VYOMIRTHA home">
+      <a
+        className="brand"
+        href="/"
+        onClick={(e) => {
+          e.preventDefault()
+          navigate('/')
+        }}
+        aria-label="VYOMIRTHA home"
+      >
         <span>VYOMIRTHA <i>— wait-list</i></span>
       </a>
       <nav aria-label="Primary navigation">
         <a href="#how-it-works">How it works</a>
         <a href="#access">Access</a>
-        <a href="#/contact">Contact</a>
+        <a
+          href="/contact"
+          onClick={(e) => {
+            e.preventDefault()
+            navigate('/contact')
+          }}
+        >
+          Contact
+        </a>
       </nav>
-      <a className="header-cta" href="#access">Join the waitlist <Arrow /></a>
+      <div className="header-actions">
+        <a
+          className="header-leaderboard-btn"
+          href="/leaderboard"
+          onClick={(e) => {
+            e.preventDefault()
+            navigate('/leaderboard')
+          }}
+          title="View India's Top Builders Leaderboard"
+        >
+          <IndianFlag width={17} height={11} />
+          <span>BUILDER'S LEADERBOARD</span>
+          <span className="live-badge"><i /> LIVE</span>
+        </a>
+        <a className="header-cta" href="#access">Join the waitlist <Arrow /></a>
+      </div>
     </header>
   )
 }
@@ -355,7 +341,16 @@ function Access() {
             <li>Basic account timeline</li>
             <li>Track one ICP</li>
           </ul>
-          <a className="button button--primary access-cta" href="#/submission?tier=free">Join the free waitlist <Arrow /></a>
+          <a
+            className="button button--primary access-cta"
+            href="/submission?tier=free"
+            onClick={(e) => {
+              e.preventDefault()
+              navigate('/submission?tier=free')
+            }}
+          >
+            Join the free waitlist <Arrow />
+          </a>
         </article>
         <article className={`access-option access-option--founding ${soldOut ? 'access-option--sold-out' : ''}`}>
           <div className="founding-line" aria-hidden="true" />
@@ -377,7 +372,16 @@ function Access() {
             <li>Track multiple ICPs</li>
           </ul>
           <div className="founding-footer">
-            <a className="button button--outline" href={soldOut ? '#/submission?tier=free' : '#/submission?tier=founding'}>{soldOut ? 'Join the free waitlist' : 'Claim founding access'} <Arrow /></a>
+            <a
+              className="button button--outline"
+              href={soldOut ? '/submission?tier=free' : '/submission?tier=founding'}
+              onClick={(e) => {
+                e.preventDefault()
+                navigate(soldOut ? '/submission?tier=free' : '/submission?tier=founding')
+              }}
+            >
+              {soldOut ? 'Join the free waitlist' : 'Claim founding access'} <Arrow />
+            </a>
           </div>
           {totalSeats && <p className="founder-activity"><i /> {soldOut ? `All ${totalSeats} founding seats are filled.` : `${claimedSeats} founders are already inside.`}</p>}
         </article>
@@ -388,7 +392,32 @@ function Access() {
 }
 
 function Footer() {
-  return <footer className="footer section-shell"><a className="brand" href="#/"><span>VYOMIRTHA</span></a><p>We don’t just find activity. We understand change.</p><span><a href="#/contact">Contact</a> · © {new Date().getFullYear()}</span></footer>
+  return (
+    <footer className="footer section-shell">
+      <a
+        className="brand"
+        href="/"
+        onClick={(e) => {
+          e.preventDefault()
+          navigate('/')
+        }}
+      >
+        <span>VYOMIRTHA</span>
+      </a>
+      <p>We don’t just find activity. We understand change.</p>
+      <span>
+        <a
+          href="/contact"
+          onClick={(e) => {
+            e.preventDefault()
+            navigate('/contact')
+          }}
+        >
+          Contact
+        </a> · © {new Date().getFullYear()}
+      </span>
+    </footer>
+  )
 }
 
 function Landing() {
@@ -431,7 +460,7 @@ function Submission({ tier = 'free' }) {
       })
       const query = new URLSearchParams({ type: founding ? 'founding' : 'free', status: 'submitted', email: form.email.trim(), name: form.name.trim() })
       if (result?.seatNumber) query.set('seat', result.seatNumber)
-      navigate(`#/confirmation?${query.toString()}`)
+      navigate(`/confirmation?${query.toString()}`)
     } catch (submissionError) {
       setError(submissionError.message)
       setBusy(false)
@@ -445,7 +474,16 @@ function Submission({ tier = 'free' }) {
 
   return (
     <main className="checkout-page submission-page">
-      <a className="brand checkout-brand" href="#/"><span>VYOMIRTHA</span></a>
+      <a
+        className="brand checkout-brand"
+        href="/"
+        onClick={(e) => {
+          e.preventDefault()
+          navigate('/')
+        }}
+      >
+        <span>VYOMIRTHA</span>
+      </a>
       <section className={`checkout-panel submission-panel ${founding ? 'submission-panel--founding' : ''}`} aria-labelledby="submission-title">
         <div className="checkout-top"><p className="eyebrow">{founding && <i />}{founding ? 'Founding access' : 'Free tier'}</p>{founding ? <span>{totalSeats ? `${claimedSeats} / ${totalSeats} CLAIMED` : 'SEATS UPDATING'}</span> : <span>EARLY ACCESS</span>}</div>
         <h1 id="submission-title">{title}</h1>
@@ -481,13 +519,43 @@ function Confirmation({ type, email, status, seat, paidAt, receiptEmail }) {
   if (state === 'failed') {
     return (
       <main className="confirmation-page confirmation-page--failed">
-        <a className="brand checkout-brand" href="#/"><span>VYOMIRTHA</span></a>
+        <a
+          className="brand checkout-brand"
+          href="/"
+          onClick={(e) => {
+            e.preventDefault()
+            navigate('/')
+          }}
+        >
+          <span>VYOMIRTHA</span>
+        </a>
         <section className="confirmation-panel confirmation-panel--failed" aria-labelledby="confirmation-title">
           <p className="eyebrow">Payment incomplete</p>
           <h1 id="confirmation-title">Your seat isn’t<br />reserved yet.</h1>
           <p className="confirmation-copy">No payment was captured and no Founding seat has been claimed. You can safely return to your submission and try again.</p>
           <div className="confirmation-status-row"><span>STATUS</span><b>PAYMENT NOT COMPLETED</b></div>
-          <div className="confirmation-actions"><a className="button button--primary" href="#/submission?tier=founding">Return to submission <Arrow /></a><a className="text-link" href="#/">Back to VYOMIRTHA</a></div>
+          <div className="confirmation-actions">
+            <a
+              className="button button--primary"
+              href="/submission?tier=founding"
+              onClick={(e) => {
+                e.preventDefault()
+                navigate('/submission?tier=founding')
+              }}
+            >
+              Return to submission <Arrow />
+            </a>
+            <a
+              className="text-link"
+              href="/"
+              onClick={(e) => {
+                e.preventDefault()
+                navigate('/')
+              }}
+            >
+              Back to VYOMIRTHA
+            </a>
+          </div>
         </section>
       </main>
     )
@@ -496,14 +564,32 @@ function Confirmation({ type, email, status, seat, paidAt, receiptEmail }) {
   if (state === 'already') {
     return (
       <main className="confirmation-page">
-        <a className="brand checkout-brand" href="#/"><span>VYOMIRTHA</span></a>
+        <a
+          className="brand checkout-brand"
+          href="/"
+          onClick={(e) => {
+            e.preventDefault()
+            navigate('/')
+          }}
+        >
+          <span>VYOMIRTHA</span>
+        </a>
         <section className="confirmation-panel confirmation-panel--status" aria-labelledby="confirmation-title">
           <p className="eyebrow">Access status</p>
           <h1 id="confirmation-title">You’re already in.</h1>
           <p className="confirmation-copy">{founding ? 'Your Founding Access is secured at $29/mo for life.' : 'Your waitlist place is confirmed. We’ll notify you when your access is ready.'}</p>
           <div className="confirmation-status-row"><span>{founding ? `FOUNDING BATCH / SEAT #${seatLabel}` : 'WAITLIST STATUS'}</span><b>{founding ? 'FOUNDING ACCESS SECURED' : 'EARLY ACCESS QUEUED'}</b></div>
           {email && <p className="submitted-email">Registered to <b>{email}</b></p>}
-          <a className="button button--outline confirmation-return" href="#/">Back to VYOMIRTHA <Arrow /></a>
+          <a
+            className="button button--outline confirmation-return"
+            href="/"
+            onClick={(e) => {
+              e.preventDefault()
+              navigate('/')
+            }}
+          >
+            Back to VYOMIRTHA <Arrow />
+          </a>
         </section>
       </main>
     )
@@ -512,7 +598,16 @@ function Confirmation({ type, email, status, seat, paidAt, receiptEmail }) {
   if (!founding) {
     return (
       <main className="confirmation-page">
-        <a className="brand checkout-brand" href="#/"><span>VYOMIRTHA</span></a>
+        <a
+          className="brand checkout-brand"
+          href="/"
+          onClick={(e) => {
+            e.preventDefault()
+            navigate('/')
+          }}
+        >
+          <span>VYOMIRTHA</span>
+        </a>
         <section className="confirmation-panel confirmation-panel--free" aria-labelledby="confirmation-title">
           <p className="eyebrow">Waitlist confirmed</p>
           <h1 id="confirmation-title">You’re on<br />the waitlist.</h1>
@@ -520,7 +615,16 @@ function Confirmation({ type, email, status, seat, paidAt, receiptEmail }) {
           <div className="confirmation-status-row"><span>ACCESS STATUS</span><b>EARLY ACCESS QUEUED</b></div>
           {email && <p className="submitted-email">Registered to <b>{email}</b></p>}
           <div className="next-step"><span>WHAT HAPPENS NEXT</span><p><b>01</b> We’ll prepare your early-access invite.</p><p><b>02</b> Bring the ICP you want to monitor first.</p></div>
-          <a className="button button--outline" href="#/">Back to VYOMIRTHA <Arrow /></a>
+          <a
+            className="button button--outline"
+            href="/"
+            onClick={(e) => {
+              e.preventDefault()
+              navigate('/')
+            }}
+          >
+            Back to VYOMIRTHA <Arrow />
+          </a>
         </section>
       </main>
     )
@@ -529,7 +633,16 @@ function Confirmation({ type, email, status, seat, paidAt, receiptEmail }) {
   if (state === 'submitted') {
     return (
       <main className="confirmation-page confirmation-page--founding">
-        <a className="brand checkout-brand" href="#/"><span>VYOMIRTHA</span></a>
+        <a
+          className="brand checkout-brand"
+          href="/"
+          onClick={(e) => {
+            e.preventDefault()
+            navigate('/')
+          }}
+        >
+          <span>VYOMIRTHA</span>
+        </a>
         <section className="confirmation-panel confirmation-panel--founding confirmation-panel--requested" aria-labelledby="confirmation-title">
           <div className="credential" aria-label="Founding Access request credential">
             <span className="credential-spark" aria-hidden="true">✦</span>
@@ -545,7 +658,16 @@ function Confirmation({ type, email, status, seat, paidAt, receiptEmail }) {
             <section><span>FOUNDER RATE</span><p><b>$29 / month</b><small>Locked only after payment is completed</small></p></section>
             <section><span>WHAT HAPPENS NEXT</span><p><b>We review your fit.</b><small>Then we send the secure payment and onboarding step.</small></p></section>
           </div>
-          <a className="button button--outline" href="#/">Back to VYOMIRTHA <Arrow /></a>
+          <a
+            className="button button--outline"
+            href="/"
+            onClick={(e) => {
+              e.preventDefault()
+              navigate('/')
+            }}
+          >
+            Back to VYOMIRTHA <Arrow />
+          </a>
         </section>
       </main>
     )
@@ -553,7 +675,16 @@ function Confirmation({ type, email, status, seat, paidAt, receiptEmail }) {
 
   return (
     <main className="confirmation-page confirmation-page--founding">
-      <a className="brand checkout-brand" href="#/"><span>VYOMIRTHA</span></a>
+      <a
+        className="brand checkout-brand"
+        href="/"
+        onClick={(e) => {
+          e.preventDefault()
+          navigate('/')
+        }}
+      >
+        <span>VYOMIRTHA</span>
+      </a>
       <section className="confirmation-panel confirmation-panel--founding" aria-labelledby="confirmation-title">
         <div className="credential" aria-label={`Founding member credential, seat ${seatLabel} of ${totalSeatsLabel}`}>
           <span className="credential-spark" aria-hidden="true">✦</span>
@@ -570,7 +701,16 @@ function Confirmation({ type, email, status, seat, paidAt, receiptEmail }) {
           <section><span>PAYMENT</span><p><b>Paid · {paymentDate}</b>{receiptTo ? <a href={`mailto:${receiptTo}?subject=VYOMIRTHA%20Founding%20Access%20Receipt`}>Receipt → {receiptTo}</a> : <small>Receipt sent to your payment email</small>}</p></section>
         </div>
         <div className="next-step"><span>WHAT HAPPENS NEXT</span><p><b>01</b> We prepare your access.</p><p><b>02</b> You’ll receive your onboarding link.</p><p><b>03</b> Bring the ICP you want to monitor first.</p></div>
-        <a className="button button--outline" href={`#/confirmation?type=founding&status=already&seat=${seatNumber}`}>View your access status <Arrow /></a>
+        <a
+          className="button button--outline"
+          href={`/confirmation?type=founding&status=already&seat=${seatNumber}`}
+          onClick={(e) => {
+            e.preventDefault()
+            navigate(`/confirmation?type=founding&status=already&seat=${seatNumber}`)
+          }}
+        >
+          View your access status <Arrow />
+        </a>
       </section>
     </main>
   )
@@ -605,7 +745,16 @@ function Contact() {
 
   return (
     <main className="contact-page">
-      <a className="brand checkout-brand" href="#/"><span>VYOMIRTHA</span></a>
+      <a
+        className="brand checkout-brand"
+        href="/"
+        onClick={(e) => {
+          e.preventDefault()
+          navigate('/')
+        }}
+      >
+        <span>VYOMIRTHA</span>
+      </a>
       <section className="contact-panel" aria-labelledby="contact-title">
         <div className="contact-top"><p className="eyebrow">Contact</p><span>SUPPORT / PARTNERSHIPS</span></div>
         <h1 id="contact-title">Start a<br />conversation.</h1>
@@ -619,7 +768,27 @@ function Contact() {
           <button className="button button--primary" type="submit" disabled={busy}>{busy ? 'Sending…' : 'Send message'} <Arrow /></button>
         </form>
       </section>
-      {sent && <div className="contact-modal-backdrop" role="presentation"><section className="contact-success" role="dialog" aria-modal="true" aria-labelledby="contact-success-title"><span className="contact-success-spark" aria-hidden="true">✦</span><p className="eyebrow">Ticket received</p><h2 id="contact-success-title">Your ticket<br />was sent.</h2><p>You’ll receive a response at <b>{form.email}</b> within 24 hours. Thank you.</p><div><span>REFERENCE</span><b>VYOMIRTHA / SUPPORT</b></div><a className="button button--outline" href="#/">Back to VYOMIRTHA <Arrow /></a></section></div>}
+      {sent && (
+        <div className="contact-modal-backdrop" role="presentation">
+          <section className="contact-success" role="dialog" aria-modal="true" aria-labelledby="contact-success-title">
+            <span className="contact-success-spark" aria-hidden="true">✦</span>
+            <p className="eyebrow">Ticket received</p>
+            <h2 id="contact-success-title">Your ticket<br />was sent.</h2>
+            <p>You’ll receive a response at <b>{form.email}</b> within 24 hours. Thank you.</p>
+            <div><span>REFERENCE</span><b>VYOMIRTHA / SUPPORT</b></div>
+            <a
+              className="button button--outline"
+              href="/"
+              onClick={(e) => {
+                e.preventDefault()
+                navigate('/')
+              }}
+            >
+              Back to VYOMIRTHA <Arrow />
+            </a>
+          </section>
+        </div>
+      )}
     </main>
   )
 }
@@ -627,6 +796,7 @@ function Contact() {
 export default function App() {
   const { path, params } = useRoute()
   const view = useMemo(() => {
+    if (path === '/leaderboard') return <LeaderboardPage />
     if (path === '/submission' || path === '/checkout') return <Submission tier={params.get('tier') === 'founding' || path === '/checkout' ? 'founding' : 'free'} />
     if (path === '/confirmation') return <Confirmation type={params.get('type')} email={params.get('email')} status={params.get('status')} seat={params.get('seat')} paidAt={params.get('paidAt')} receiptEmail={params.get('receiptEmail')} />
     if (path === '/contact') return <Contact />
