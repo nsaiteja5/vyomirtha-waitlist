@@ -13,6 +13,11 @@ from services import firebase_service as db
 from services import cashfree_service as cashfree
 from routes.auth import decode_token
 
+# Lazy import to avoid circular dependency
+async def _recalculate():
+    from routes.leaderboard_routes import recalculate_and_store_board
+    return await recalculate_and_store_board()
+
 router = APIRouter()
 
 
@@ -77,18 +82,25 @@ async def create_order(request: Request):
                 print(f"[Firebase Warning] Could not fetch user data: {e}")
 
             new_balance = current_balance + float(amount)
+            payment_count = int(user_data.get("paymentCount", 0)) + 1 if isinstance(user_data, dict) else 1
 
-            # Update user balance in Firebase RTDB
+            # Update full user payment record in Firebase RTDB
             try:
                 await db.patch(
                     f"leaderboard/users/{user_id}",
-                    {"balance": new_balance, "lastPaidAt": now},
+                    {
+                        "balance": new_balance,
+                        "lastPaidAt": now,
+                        "lastPaidAmount": float(amount),
+                        "paymentCount": payment_count,
+                    },
                 )
                 await db.put(
                     f"leaderboard/pendingOrders/{order_id}",
                     {
                         "userId": user_id,
                         "userName": user_name,
+                        "userHandle": user_handle,
                         "amount": float(amount),
                         "status": "completed",
                         "createdAt": now,
@@ -100,8 +112,8 @@ async def create_order(request: Request):
 
             position = 1
             try:
-                all_users = await db.get("leaderboard/users")
-                position, _ = _compute_user_position(user_id, all_users)
+                entries, _ = await _recalculate()
+                position = next((e["position"] for e in entries if e["id"] == user_id), 1)
             except Exception as e:
                 print(f"[Firebase Warning] Rank calculation error: {e}")
 
@@ -239,17 +251,21 @@ async def payment_webhook(request: Request):
 
     now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
-    # Update user balance (accumulate)
+    # Update user balance (accumulate) and full payment metadata
     user_data = await db.get(f"leaderboard/users/{user_id}")
     user_data = user_data if isinstance(user_data, dict) else {}
     current_balance = float(user_data.get("balance", 0))
     new_balance = current_balance + amount
+    payment_count = int(user_data.get("paymentCount", 0)) + 1
+    user_handle = user_data.get("handle", "")
 
     await db.patch(
         f"leaderboard/users/{user_id}",
         {
             "balance": new_balance,
             "lastPaidAt": now,
+            "lastPaidAmount": amount,
+            "paymentCount": payment_count,
         },
     )
 
@@ -259,20 +275,16 @@ async def payment_webhook(request: Request):
         {"status": "completed", "completedAt": now},
     )
 
-    # Compute new position
-    all_users = await db.get("leaderboard/users")
-    new_position, sorted_users = _compute_user_position(user_id, all_users)
+    # Recalculate all positions and update Firebase stats
+    try:
+        entries, _ = await _recalculate()
+        new_position = next((e["position"] for e in entries if e["id"] == user_id), 1)
+    except Exception as e:
+        print(f"[Warning] Failed to recalculate board: {e}")
+        all_users = await db.get("leaderboard/users")
+        new_position, _ = _compute_user_position(user_id, all_users)
 
-    # Determine activity type
     activity_type = "claim" if current_balance == 0 else "topup"
-    for i, (uid, bal) in enumerate(sorted_users):
-        if uid != user_id and i + 1 > new_position and bal < new_balance:
-            if bal == new_balance - amount + current_balance:
-                activity_type = "reclaim"
-                break
-
-    # Add activity event
-    user_handle = user_data.get("handle", "")
 
     await db.post(
         "leaderboard/activity",
@@ -341,19 +353,29 @@ async def verify_payment(order_id: str, request: Request):
                 user_data = user_data if isinstance(user_data, dict) else {}
                 current_balance = float(user_data.get("balance", 0))
                 new_balance = current_balance + amount
+                payment_count = int(user_data.get("paymentCount", 0)) + 1
 
                 await db.patch(
                     f"leaderboard/users/{user_id}",
-                    {"balance": new_balance, "lastPaidAt": now},
+                    {
+                        "balance": new_balance,
+                        "lastPaidAt": now,
+                        "lastPaidAmount": amount,
+                        "paymentCount": payment_count,
+                    },
                 )
                 await db.patch(
                     f"leaderboard/pendingOrders/{order_id}",
                     {"status": "completed", "completedAt": now},
                 )
 
-                # Compute position
-                all_users = await db.get("leaderboard/users")
-                position, _ = _compute_user_position(user_id, all_users)
+                # Recalculate and persist all positions + stats
+                try:
+                    entries, _ = await _recalculate()
+                    position = next((e["position"] for e in entries if e["id"] == user_id), 1)
+                except Exception:
+                    all_users = await db.get("leaderboard/users")
+                    position, _ = _compute_user_position(user_id, all_users)
 
                 # Activity event
                 await db.post(

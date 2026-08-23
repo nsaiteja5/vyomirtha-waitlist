@@ -101,7 +101,7 @@ const SAVAGE_HERO_COPY = [
   "Someone less ambitious is currently above you.",
   "You call yourself a builder. Prove it.",
   "Don't enter if you're scared of getting outranked.",
-  "₹10 gets you on the board. What's stopping you?",
+  "₹1 gets you on the board. What's stopping you?",
   "There is a hierarchy of Indian builders. You're not in it yet.",
   "You can leave. Your rank won't wait.",
   "Someone took the spot you think you deserve. Take it back.",
@@ -373,7 +373,7 @@ function useActivity() {
 }
 
 function useConfig() {
-  const [config, setConfig] = useState({ showDemoProfiles: true, minBid: 10 })
+  const [config, setConfig] = useState({ showDemoProfiles: true, minBid: 1 })
 
   useEffect(() => {
     fetchConfig().then(setConfig).catch(() => {})
@@ -532,8 +532,8 @@ function LiveArenaStrip({ entries, events, onOpenModal }) {
           </div>
         </div>
 
-        <button className="lb-quick-enter-btn" onClick={() => onOpenModal(10)}>
-          JOIN ARENA → ₹10
+        <button className="lb-quick-enter-btn" onClick={() => onOpenModal(1)}>
+          JOIN ARENA → ₹1
         </button>
       </div>
     </div>
@@ -557,7 +557,7 @@ function LeaderboardHero({ topUser, user, onClaim, onTakeSpot, onSelectBuilder }
   const currentCopy = SAVAGE_HERO_COPY[savageIndex]
   const topAmount = topUser?.balance || 0
   const isMeTop = topUser && user && topUser.id === user.id
-  const takeTopPrice = topUser ? topAmount + 1 : 10
+  const takeTopPrice = topUser ? topAmount + 1 : 1
 
   return (
     <section className="lb-hero" aria-labelledby="lb-hero-title">
@@ -673,10 +673,10 @@ function LeaderboardHero({ topUser, user, onClaim, onTakeSpot, onSelectBuilder }
               className="lb-take-one-btn"
               onClick={() => onTakeSpot(topUser || { balance: 0, name: '#1', position: 1 })}
             >
-              {isMeTop ? `⚡ EXTEND YOUR #01 LEAD (+₹10)` : `🔥 TAKE HIS SPOT → ${formatAmount(takeTopPrice)}`}
+              {isMeTop ? `⚡ EXTEND YOUR #01 LEAD (+₹${topAmount + 1})` : `🔥 TAKE HIS SPOT → ${formatAmount(takeTopPrice)}`}
             </button>
             <div className="lb-spotlight-footer-note">
-              Starting at just <strong>₹10</strong>. <em>Yes. We're serious.</em>
+              Starting at just <strong>₹1</strong>. <em>Yes. We're serious.</em>
             </div>
           </div>
         </div>
@@ -784,7 +784,7 @@ function TopThreeShowcase({ entries, onTakeSpot, onSelectBuilder }) {
               <h4>OPEN SPOT #02</h4>
               <p>No builder here yet.</p>
               <button className="lb-trophy-claim-open" onClick={() => onTakeSpot({ balance: 0, position: 2 })}>
-                CLAIM #02 FOR ₹10 ↗
+                CLAIM #02 FOR ₹1 ↗
               </button>
             </div>
           )}
@@ -852,7 +852,7 @@ function TopThreeShowcase({ entries, onTakeSpot, onSelectBuilder }) {
               <h4 className="lb-gold-name">#01 IS UNCLAIMED</h4>
               <p>Sit at the very top of India's Builder Board.</p>
               <button className="lb-trophy-claim-open lb-gold-take-btn" onClick={() => onTakeSpot({ balance: 0, position: 1 })}>
-                CLAIM #01 FOR ₹10 ↗
+                CLAIM #01 FOR ₹1 ↗
               </button>
             </div>
           )}
@@ -919,7 +919,7 @@ function TopThreeShowcase({ entries, onTakeSpot, onSelectBuilder }) {
               <h4>OPEN SPOT #03</h4>
               <p>No builder here yet.</p>
               <button className="lb-trophy-claim-open" onClick={() => onTakeSpot({ balance: 0, position: 3 })}>
-                CLAIM #03 FOR ₹10 ↗
+                CLAIM #03 FOR ₹1 ↗
               </button>
             </div>
           )}
@@ -1102,8 +1102,19 @@ function BuilderProfileModal({ builder, onClose, onTakeSpot }) {
    ═══════════════════════════════════════ */
 
 function BidSection({ entries, user, config, onOpenModal }) {
-  const [amount, setAmount] = useState('25')
-  const minBid = config.minBid || 10
+  const [amount, setAmount] = useState('5')
+  const minBid = config.minBid || 1
+
+  // Dynamic: cost of position K = max(1, balance_of_position_(K-1) - 1)
+  const getPositionPrice = (pos) => {
+    if (entries.length === 0) return 1
+    const above = entries.find((e) => e.position === pos - 1)
+    if (above) return Math.max(1, above.balance - 1)
+    // If position above isn't occupied, find closest occupied above and subtract distance
+    const closestAbove = [...entries].filter((e) => e.position < pos).sort((a, b) => b.position - a.position)[0]
+    if (!closestAbove) return 1
+    return Math.max(1, closestAbove.balance - (pos - closestAbove.position))
+  }
 
   const targetExample = useMemo(() => {
     if (entries.length >= 3) {
@@ -1114,7 +1125,7 @@ function BidSection({ entries, user, config, onOpenModal }) {
       const last = entries[entries.length - 1]
       return { pos: last.position, cost: last.balance, nextCost: last.balance + 1 }
     }
-    return { pos: 1, cost: 0, nextCost: 10 }
+    return { pos: 1, cost: 0, nextCost: 1 }
   }, [entries])
 
   const preview = useMemo(() => {
@@ -1150,7 +1161,7 @@ function BidSection({ entries, user, config, onOpenModal }) {
     const topBal = entries[0]?.balance || 0
     const me = entries.find((e) => e.id === user?.id)
     const myCurrent = me?.balance || 0
-    const needed = Math.max(10, topBal - myCurrent + 1)
+    const needed = Math.max(1, topBal - myCurrent + 1)
     setAmount(String(needed))
   }
 
@@ -1185,10 +1196,10 @@ function BidSection({ entries, user, config, onOpenModal }) {
               <div className="lb-preset-buttons">
                 <button
                   type="button"
-                  className={`lb-preset-btn ${amount === '10' ? 'is-active' : ''}`}
-                  onClick={() => handleQuickSelect(10)}
+                  className={`lb-preset-btn ${amount === '1' ? 'is-active' : ''}`}
+                  onClick={() => handleQuickSelect(1)}
                 >
-                  ₹10 (Entry)
+                  ₹1 (Entry)
                 </button>
                 <button
                   type="button"
@@ -1292,6 +1303,15 @@ function LeaderboardBoard({ entries, flashed, onTakeSpot, onSelectBuilder }) {
   const openSlotsCount = Math.max(0, totalSlotsToShow - currentCount)
   const openSlots = Array.from({ length: openSlotsCount }, (_, idx) => currentCount + idx + 1)
 
+  // Dynamic pricing: cost of open position K = max(1, balance_of_position_(K-1) - 1)
+  const getOpenSlotPrice = (pos) => {
+    const above = entries.find((e) => e.position === pos - 1)
+    if (above) return Math.max(1, above.balance - 1)
+    const closestAbove = [...entries].filter((e) => e.position < pos).sort((a, b) => b.position - a.position)[0]
+    if (!closestAbove) return 1
+    return Math.max(1, closestAbove.balance - (pos - closestAbove.position))
+  }
+
   return (
     <div className="lb-board-container">
       <div className="lb-board-header">
@@ -1367,7 +1387,9 @@ function LeaderboardBoard({ entries, flashed, onTakeSpot, onSelectBuilder }) {
         ))}
 
         {/* Open Stadium Slots */}
-        {openSlots.map((pos) => (
+        {openSlots.map((pos) => {
+          const slotPrice = getOpenSlotPrice(pos)
+          return (
           <div className="lb-row lb-row--open" key={`open-${pos}`}>
             <div className="lb-row-rank lb-open-rank">
               <span className="lb-rank-hash">#</span>
@@ -1384,21 +1406,22 @@ function LeaderboardBoard({ entries, flashed, onTakeSpot, onSelectBuilder }) {
                 <span className="lb-open-tag">UNCLAIMED</span>
               </div>
               <div className="lb-open-meta">
-                <span>Grab this spot in India's builder hierarchy for just ₹10.</span>
+                <span>Grab this spot in India's builder hierarchy for just {formatAmount(slotPrice)}.</span>
               </div>
             </div>
 
             <div className="lb-row-right">
-              <span className="lb-open-price">₹10</span>
+              <span className="lb-open-price">{formatAmount(slotPrice)}</span>
               <button
                 className="lb-open-claim-btn"
-                onClick={() => onTakeSpot({ balance: 0, position: pos })}
+                onClick={() => onTakeSpot({ balance: slotPrice - 1, position: pos })}
               >
                 CLAIM SPOT ↗
               </button>
             </div>
           </div>
-        ))}
+          )
+        })}
       </div>
     </div>
   )
@@ -1481,7 +1504,7 @@ function HowItWorks() {
           <div className="lb-how-step">
             <div className="lb-how-num">02</div>
             <h4>Pay & Take Any Spot</h4>
-            <p>Starting at just ₹10. Your balance accumulates — pay more anytime to climb higher.</p>
+            <p>Starting at just ₹1. Your balance accumulates — pay more anytime to climb higher.</p>
           </div>
           <div className="lb-how-step">
             <div className="lb-how-num">03</div>
@@ -2254,7 +2277,7 @@ export default function LeaderboardPage() {
       const occupant = leaderboard.find((e) => e.position === prevPos)
       const myBal = me.balance || 0
       const occBal = occupant?.balance || 0
-      const needed = Math.max(10, occBal - myBal + 1)
+      const needed = Math.max(1, occBal - myBal + 1)
       setOutbid({
         oldPosition: prevPos,
         newPosition: me.position,
@@ -2275,7 +2298,7 @@ export default function LeaderboardPage() {
   const handleTakeSpot = (entry) => {
     const me = leaderboard.find((e) => e.id === user?.id)
     const myBalance = me?.balance || 0
-    const needed = Math.max(10, (entry.balance || 0) - myBalance + 1)
+    const needed = Math.max(1, (entry.balance || 0) - myBalance + 1)
     setModalAmount(String(needed))
     setModalOpen(true)
   }
