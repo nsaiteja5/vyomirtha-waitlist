@@ -247,20 +247,28 @@ async def x_callback(request: Request, code: str = "", state: str = "", error: s
 
     # Store / update user profile in Firebase
     now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-    existing = await db.get(f"leaderboard/users/{x_id}")
-
     profile_data = {
         "name": name,
         "handle": handle,
         "avatar": avatar,
         "updatedAt": now,
     }
-    if not existing:
+    if not existing or not isinstance(existing, dict):
         profile_data["bio"] = bio
-        profile_data["title"] = ""
+        profile_data["state"] = ""
+        profile_data["language"] = ""
+        profile_data["motto"] = ""
+        profile_data["projects"] = []
+        profile_data["achievement"] = ""
         profile_data["flex"] = ""
-        profile_data["links"] = {}
+        profile_data["title"] = ""
+        profile_data["links"] = {"website": "", "github": "", "linkedin": ""}
+        profile_data["phone"] = ""
         profile_data["balance"] = 0
+        profile_data["position"] = None
+        profile_data["paymentCount"] = 0
+        profile_data["lastPaidAmount"] = 0
+        profile_data["lastPaidAt"] = ""
         profile_data["createdAt"] = now
 
     await db.patch(f"leaderboard/users/{x_id}", profile_data)

@@ -167,6 +167,19 @@ function formatAmount(n) {
   return '₹' + Number(n).toLocaleString('en-IN')
 }
 
+export function getPositionPrice(pos, entries = []) {
+  if (pos <= 1) {
+    const top = entries.find((e) => e.position === 1) || entries[0]
+    return top ? (top.balance || 0) + 1 : 1
+  }
+  // For rank K (K >= 2): price is (balance of rank K-1) - 1, or closest occupied above minus distance
+  const above = entries.find((e) => e.position === pos - 1)
+  if (above) return Math.max(1, (above.balance || 0) - 1)
+  const closestAbove = [...entries].filter((e) => e.position < pos).sort((a, b) => b.position - a.position)[0]
+  if (!closestAbove) return 1
+  return Math.max(1, (closestAbove.balance || 0) - (pos - closestAbove.position))
+}
+
 function timeAgo(ts) {
   if (!ts) return 'just now'
   const diff = (Date.now() - new Date(ts).getTime()) / 1000
@@ -709,6 +722,8 @@ function TopThreeShowcase({ entries, onTakeSpot, onSelectBuilder }) {
   const top1 = entries[0] || null
   const top2 = entries[1] || null
   const top3 = entries[2] || null
+  const openPrice2 = getPositionPrice(2, entries)
+  const openPrice3 = getPositionPrice(3, entries)
 
   return (
     <div className="lb-trophy-section">
@@ -775,7 +790,7 @@ function TopThreeShowcase({ entries, onTakeSpot, onSelectBuilder }) {
               {top2.achievement && <div className="lb-trophy-achievement">⚡ {top2.achievement}</div>}
               <div className="lb-trophy-amount">{formatAmount(top2.balance)}</div>
               <button className="lb-trophy-take-btn" onClick={() => onTakeSpot(top2)}>
-                TAKE #02 SPOT → {formatAmount(top2.balance + 1)}
+                TAKE #02 SPOT → {formatAmount((top2.balance || 0) + 1)}
               </button>
             </>
           ) : (
@@ -783,8 +798,8 @@ function TopThreeShowcase({ entries, onTakeSpot, onSelectBuilder }) {
               <div className="lb-trophy-open-icon">+</div>
               <h4>OPEN SPOT #02</h4>
               <p>No builder here yet.</p>
-              <button className="lb-trophy-claim-open" onClick={() => onTakeSpot({ balance: 0, position: 2 })}>
-                CLAIM #02 FOR ₹1 ↗
+              <button className="lb-trophy-claim-open" onClick={() => onTakeSpot({ balance: openPrice2 - 1, position: 2 })}>
+                CLAIM #02 FOR {formatAmount(openPrice2)} ↗
               </button>
             </div>
           )}
@@ -910,7 +925,7 @@ function TopThreeShowcase({ entries, onTakeSpot, onSelectBuilder }) {
               {top3.achievement && <div className="lb-trophy-achievement">⚡ {top3.achievement}</div>}
               <div className="lb-trophy-amount">{formatAmount(top3.balance)}</div>
               <button className="lb-trophy-take-btn" onClick={() => onTakeSpot(top3)}>
-                TAKE #03 SPOT → {formatAmount(top3.balance + 1)}
+                TAKE #03 SPOT → {formatAmount((top3.balance || 0) + 1)}
               </button>
             </>
           ) : (
@@ -918,8 +933,8 @@ function TopThreeShowcase({ entries, onTakeSpot, onSelectBuilder }) {
               <div className="lb-trophy-open-icon">+</div>
               <h4>OPEN SPOT #03</h4>
               <p>No builder here yet.</p>
-              <button className="lb-trophy-claim-open" onClick={() => onTakeSpot({ balance: 0, position: 3 })}>
-                CLAIM #03 FOR ₹1 ↗
+              <button className="lb-trophy-claim-open" onClick={() => onTakeSpot({ balance: openPrice3 - 1, position: 3 })}>
+                CLAIM #03 FOR {formatAmount(openPrice3)} ↗
               </button>
             </div>
           )}
@@ -1105,16 +1120,10 @@ function BidSection({ entries, user, config, onOpenModal }) {
   const [amount, setAmount] = useState('5')
   const minBid = config.minBid || 1
 
-  // Dynamic: cost of position K = max(1, balance_of_position_(K-1) - 1)
-  const getPositionPrice = (pos) => {
-    if (entries.length === 0) return 1
-    const above = entries.find((e) => e.position === pos - 1)
-    if (above) return Math.max(1, above.balance - 1)
-    // If position above isn't occupied, find closest occupied above and subtract distance
-    const closestAbove = [...entries].filter((e) => e.position < pos).sort((a, b) => b.position - a.position)[0]
-    if (!closestAbove) return 1
-    return Math.max(1, closestAbove.balance - (pos - closestAbove.position))
-  }
+  const topBal = entries[0]?.balance || 0
+  const topTakePrice = getPositionPrice(1, entries)
+  const rank2Price = getPositionPrice(2, entries)
+  const rank3Price = getPositionPrice(3, entries)
 
   const targetExample = useMemo(() => {
     if (entries.length >= 3) {
@@ -1158,7 +1167,6 @@ function BidSection({ entries, user, config, onOpenModal }) {
   }
 
   const handleTakeTopOne = () => {
-    const topBal = entries[0]?.balance || 0
     const me = entries.find((e) => e.id === user?.id)
     const myCurrent = me?.balance || 0
     const needed = Math.max(1, topBal - myCurrent + 1)
@@ -1199,35 +1207,28 @@ function BidSection({ entries, user, config, onOpenModal }) {
                   className={`lb-preset-btn ${amount === '1' ? 'is-active' : ''}`}
                   onClick={() => handleQuickSelect(1)}
                 >
-                  ₹1 (Entry)
+                  ₹1 (Base)
                 </button>
                 <button
                   type="button"
-                  className={`lb-preset-btn ${amount === '20' ? 'is-active' : ''}`}
-                  onClick={() => handleQuickSelect(20)}
+                  className={`lb-preset-btn ${amount === String(rank3Price) ? 'is-active' : ''}`}
+                  onClick={() => handleQuickSelect(rank3Price)}
                 >
-                  ₹20
+                  {formatAmount(rank3Price)} (Take #03)
                 </button>
                 <button
                   type="button"
-                  className={`lb-preset-btn ${amount === '25' ? 'is-active' : ''}`}
-                  onClick={() => handleQuickSelect(25)}
+                  className={`lb-preset-btn ${amount === String(rank2Price) ? 'is-active' : ''}`}
+                  onClick={() => handleQuickSelect(rank2Price)}
                 >
-                  ₹25
-                </button>
-                <button
-                  type="button"
-                  className={`lb-preset-btn ${amount === '50' ? 'is-active' : ''}`}
-                  onClick={() => handleQuickSelect(50)}
-                >
-                  ₹50
+                  {formatAmount(rank2Price)} (Take #02)
                 </button>
                 <button
                   type="button"
                   className="lb-preset-btn lb-preset-gold"
                   onClick={handleTakeTopOne}
                 >
-                  👑 TAKE #01 SPOT
+                  👑 TAKE #01 SPOT ({formatAmount(topTakePrice)})
                 </button>
               </div>
             </div>
@@ -1298,19 +1299,14 @@ function BidSection({ entries, user, config, onOpenModal }) {
 
 function LeaderboardBoard({ entries, flashed, onTakeSpot, onSelectBuilder }) {
   const rows = entries.slice(3)
-  const totalSlotsToShow = Math.max(15, entries.length + 5)
-  const currentCount = entries.length
-  const openSlotsCount = Math.max(0, totalSlotsToShow - currentCount)
-  const openSlots = Array.from({ length: openSlotsCount }, (_, idx) => currentCount + idx + 1)
-
-  // Dynamic pricing: cost of open position K = max(1, balance_of_position_(K-1) - 1)
-  const getOpenSlotPrice = (pos) => {
-    const above = entries.find((e) => e.position === pos - 1)
-    if (above) return Math.max(1, above.balance - 1)
-    const closestAbove = [...entries].filter((e) => e.position < pos).sort((a, b) => b.position - a.position)[0]
-    if (!closestAbove) return 1
-    return Math.max(1, closestAbove.balance - (pos - closestAbove.position))
-  }
+  const stadiumStartRank = 4
+  const occupiedCount = entries.length
+  const startOpenRank = Math.max(stadiumStartRank, occupiedCount + 1)
+  const maxRankToShow = Math.max(50, occupiedCount + 10)
+  const openSlots = Array.from(
+    { length: Math.max(0, maxRankToShow - startOpenRank + 1) },
+    (_, idx) => startOpenRank + idx
+  )
 
   return (
     <div className="lb-board-container">
@@ -1380,7 +1376,7 @@ function LeaderboardBoard({ entries, flashed, onTakeSpot, onSelectBuilder }) {
                   onTakeSpot(entry)
                 }}
               >
-                TAKE SPOT → {formatAmount(entry.balance + 1)}
+                TAKE SPOT → {formatAmount((entry.balance || 0) + 1)}
               </button>
             </div>
           </div>
@@ -1388,7 +1384,7 @@ function LeaderboardBoard({ entries, flashed, onTakeSpot, onSelectBuilder }) {
 
         {/* Open Stadium Slots */}
         {openSlots.map((pos) => {
-          const slotPrice = getOpenSlotPrice(pos)
+          const slotPrice = getPositionPrice(pos, entries)
           return (
           <div className="lb-row lb-row--open" key={`open-${pos}`}>
             <div className="lb-row-rank lb-open-rank">
@@ -1718,6 +1714,7 @@ function BidModal({ isOpen, onClose, user, entries, initialAmount, onLogin }) {
     website: '',
     github: '',
     linkedin: '',
+    phone: '',
   })
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -1747,6 +1744,7 @@ function BidModal({ isOpen, onClose, user, entries, initialAmount, onLogin }) {
           website: me.links?.website || '',
           github: me.links?.github || '',
           linkedin: me.links?.linkedin || '',
+          phone: me.phone || '',
         })
       } else {
         setProfile((p) => ({
@@ -1818,6 +1816,7 @@ function BidModal({ isOpen, onClose, user, entries, initialAmount, onLogin }) {
           github: profile.github.trim(),
           linkedin: profile.linkedin.trim(),
         },
+        phone: profile.phone.trim(),
       })
       setStep(2)
     } catch (e) {
@@ -1831,6 +1830,35 @@ function BidModal({ isOpen, onClose, user, entries, initialAmount, onLogin }) {
     if (!val || val < 1) return setError('Enter a valid amount.')
     setBusy(true)
     setError('')
+
+    // Guarantee full sync of profile to Firebase before initiating payment
+    const validProjects = profile.projects
+      .filter((p) => p.name.trim() || p.url.trim())
+      .map((p) => ({
+        name: p.name.trim(),
+        url: p.url.trim(),
+        description: p.description.trim(),
+      }))
+    try {
+      await updateProfile({
+        name: profile.name.trim() || user?.name || 'Indian Builder',
+        state: profile.state,
+        language: profile.language,
+        bio: profile.bio.trim(),
+        motto: profile.motto.trim(),
+        achievement: profile.achievement.trim(),
+        projects: validProjects,
+        links: {
+          website: profile.website.trim(),
+          github: profile.github.trim(),
+          linkedin: profile.linkedin.trim(),
+        },
+        phone: profile.phone.trim(),
+      })
+    } catch (e) {
+      console.warn('Profile sync pre-payment notice:', e)
+    }
+
     try {
       const orderResp = await createOrder(val)
       const { orderId, paymentSessionId, environment, simulated } = orderResp
@@ -2077,6 +2105,26 @@ function BidModal({ isOpen, onClose, user, entries, initialAmount, onLogin }) {
                   placeholder="e.g. 1.4k ⭐ on GitHub / $8k MRR"
                 />
               </label>
+
+              {/* Personal Website & Phone */}
+              <div className="lb-modal-row">
+                <label>
+                  <span>PERSONAL WEBSITE / PORTFOLIO</span>
+                  <input
+                    value={profile.website}
+                    onChange={(e) => setProfile((p) => ({ ...p, website: e.target.value }))}
+                    placeholder="https://yourwebsite.com"
+                  />
+                </label>
+                <label>
+                  <span>PHONE / WHATSAPP (OPTIONAL)</span>
+                  <input
+                    value={profile.phone}
+                    onChange={(e) => setProfile((p) => ({ ...p, phone: e.target.value }))}
+                    placeholder="+91 98765 43210"
+                  />
+                </label>
+              </div>
 
               {/* Links */}
               <div className="lb-modal-row">

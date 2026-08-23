@@ -60,7 +60,7 @@ export async function fetchLeaderboard() {
 
 export async function fetchConfig() {
   const r = await fetch('/api/leaderboard/config')
-  if (!r.ok) return { showDemoProfiles: true, minBid: 10 }
+  if (!r.ok) return { showDemoProfiles: true, minBid: 1 }
   return r.json()
 }
 

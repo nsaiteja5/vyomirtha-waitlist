@@ -153,6 +153,10 @@ async def update_profile(request: Request):
         updates["avatar"] = user["avatar"]
 
     await db.patch(f"leaderboard/users/{user_id}", updates)
+    try:
+        await recalculate_and_store_board()
+    except Exception as e:
+        print(f"[Leaderboard Warning] Recalculation failed: {e}")
     return JSONResponse({"status": "updated", "profile": updates})
 
 
