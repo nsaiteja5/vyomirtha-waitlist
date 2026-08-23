@@ -53,7 +53,15 @@ class Settings:
     @property
     def APP_URL(self) -> str:
         """Frontend App URL for OAuth redirects and webhooks."""
-        url = get_str("VITE_APP_URL", "") or get_str("APP_URL", "http://localhost:5173")
+        url = get_str("VITE_APP_URL", "") or get_str("APP_URL", "")
+        if not url:
+            vercel_url = get_str("VERCEL_URL", "")
+            if vercel_url:
+                url = f"https://{vercel_url}"
+            else:
+                url = "https://vyomirtha.com"
+        if not url.startswith("http://") and not url.startswith("https://"):
+            url = f"https://{url}"
         return url.rstrip("/")
 
     @property

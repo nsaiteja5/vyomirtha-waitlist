@@ -38,10 +38,18 @@ app.include_router(
     leaderboard_router, prefix="/api/leaderboard", tags=["leaderboard"]
 )
 
+# Resilient fallbacks in case ASGI wrapper strips /api prefix
+app.include_router(auth_router, prefix="/auth", include_in_schema=False)
+app.include_router(cashfree_router, prefix="/cashfree", include_in_schema=False)
+app.include_router(
+    leaderboard_router, prefix="/leaderboard", include_in_schema=False
+)
+
 
 from fastapi.responses import FileResponse
 
 @app.get("/api/health")
+@app.get("/health")
 async def health():
     return {"status": "ok", "service": "vyomirtha-api"}
 
