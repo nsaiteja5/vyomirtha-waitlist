@@ -3,6 +3,77 @@ import { getFoundingAccess, joinWaitlist, sendContact, subscribeToFoundingAccess
 import xLogo from '../x.png'
 import LeaderboardPage, { IndianFlag } from './Leaderboard.jsx'
 
+const stages = [
+  { number: '01', label: 'Define your ICP', detail: 'B2B SaaS · 10–50 people · US / EU', type: 'profile' },
+  { number: '02', label: 'Listen for relevant posts', detail: '12,481 posts matching your ICP', type: 'stream' },
+  { number: '03', label: 'Add account history', detail: 'Historical behavior adds context', type: 'history' },
+  { number: '04', label: 'Find matching accounts', detail: '1,284 accounts match your ICP', type: 'accounts' },
+  { number: '05', label: 'Understand current state', detail: 'One account, across time', type: 'timeline' },
+  { number: '06', label: 'Flag potential buyers', detail: 'Accounts with a problem you can solve.', type: 'priority' },
+]
+
+const fragments = [
+  { id: 'a', name: 'Mira Chen', handle: '@mirafromops', time: '18m', copy: 'Has anyone moved away from Mixpanel lately?', stats: ['3', '11', '29'], depth: 'far' },
+  { id: 'b', name: 'Leo Hart', handle: '@leohart', time: '31m', copy: 'Pricing is getting harder to justify as the team grows.', stats: ['6', '14', '47'], depth: 'mid' },
+  { id: 'c', name: 'Aisha Khan', handle: '@aishak', time: '44m', copy: 'Looking for a recommendation from teams at our stage.', stats: ['2', '8', '28'], depth: 'near' },
+  { id: 'd', name: 'Ravi Mehta', handle: '@ravimehta', time: '1h', copy: 'Revisiting the analytics stack before our next planning cycle.', stats: ['1', '7', '18'], depth: 'far' },
+  { id: 'e', name: 'Sarah White', handle: '@sarahw', time: '2h', copy: 'Does anyone have experience migrating without losing history?', stats: ['4', '12', '33'], depth: 'mid' },
+  { id: 'f', name: 'Product notes', handle: '@notesbyjo', time: '3h', copy: 'The reporting workflow is the real issue—not the dashboard.', stats: ['5', '15', '41'], depth: 'far' },
+]
+
+const gridColumns = 16
+const gridRows = 10
+
+function baselineRow(row) {
+  return `M 0 ${(row / (gridRows - 1) * 100).toFixed(2)} L 100 ${(row / (gridRows - 1) * 100).toFixed(2)}`
+}
+
+function baselineColumn(column) {
+  return `M ${(column / (gridColumns - 1) * 100).toFixed(2)} 0 L ${(column / (gridColumns - 1) * 100).toFixed(2)} 100`
+}
+
+function HeroGrid() {
+  return (
+    <svg className="hero-grid" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+      <g>
+        {Array.from({ length: gridRows }, (_, row) => <path data-grid-row={row} d={baselineRow(row)} key={`r${row}`} />)}
+        {Array.from({ length: gridColumns }, (_, column) => <path data-grid-column={column} d={baselineColumn(column)} key={`c${column}`} />)}
+      </g>
+    </svg>
+  )
+}
+
+function Arrow() {
+  return <span aria-hidden="true" className="arrow">↗</span>
+}
+
+function XLogo({ className = 'x-logo' }) {
+  return <img className={className} src={xLogo} alt="X" />
+}
+
+function useFoundingAccess() {
+  const [access, setAccess] = useState({ loading: true, data: null })
+
+  useEffect(() => {
+    let mounted = true
+    const update = (data) => {
+      if (mounted) setAccess({ loading: false, data })
+    }
+    const unavailable = () => {
+      if (mounted) setAccess((current) => ({ ...current, loading: false }))
+    }
+
+    getFoundingAccess().then(update).catch(unavailable)
+    const unsubscribe = subscribeToFoundingAccess(update, unavailable)
+    return () => {
+      mounted = false
+      unsubscribe()
+    }
+  }, [])
+
+  return access
+}
+
 export function navigate(to) {
   if (to.startsWith('/')) {
     window.history.pushState({}, '', to)
