@@ -25,7 +25,7 @@ function App() {
       <section className={`message ${isVisible ? 'is-visible' : ''}`} aria-labelledby="coming-soon-title">
         <h1 id="coming-soon-title" style={{ color: isLight ? '#171719' : '#f1f1f3' }}>Coming soon..</h1>
         <p style={{ color: isLight ? '#77777b' : '#8e8e96' }}>
-          <a href={X_URL} target="_blank" rel="noreferrer" style={{ color: isLight ? '#303034' : '#c4c4ca' }}>@SaiTejaNmgyla</a> (x account link) is cooking..!!
+          <a href={X_URL} target="_blank" rel="noreferrer" style={{ color: isLight ? '#303034' : '#c4c4ca' }}>@SaiTejaNmgyla</a> is cooking..!!
         </p>
       </section>
     </main>
