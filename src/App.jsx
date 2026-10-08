@@ -1,18 +1,21 @@
 import { useEffect, useState } from 'react'
+import '@fontsource/space-grotesk/400.css'
+import '@fontsource/space-grotesk/500.css'
+import '@fontsource/space-grotesk/700.css'
 
 const X_URL = 'https://x.com/SaiTejaNmgyla'
 
 function App() {
-  const [isVisible, setIsVisible] = useState(false)
   const [isLight, setIsLight] = useState(false)
+  const [hasEntered, setHasEntered] = useState(false)
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setIsVisible(true), 180)
+    const timer = window.setTimeout(() => setHasEntered(true), 180)
     return () => window.clearTimeout(timer)
   }, [])
 
   return (
-    <main className={`page-shell ${isLight ? 'light-mode' : ''}`}>
+    <main className={`page-shell${isLight ? ' light-mode' : ''}`}>
       <button
         className="theme-mark"
         type="button"
@@ -22,10 +25,11 @@ function App() {
       >
         <span aria-hidden="true">☼</span>
       </button>
-      <section className={`message ${isVisible ? 'is-visible' : ''}`} aria-labelledby="coming-soon-title">
-        <h1 id="coming-soon-title" style={{ color: isLight ? '#171719' : '#f1f1f3' }}>Coming soon..</h1>
-        <p style={{ color: isLight ? '#77777b' : '#8e8e96' }}>
-          <a href={X_URL} target="_blank" rel="noreferrer" style={{ color: isLight ? '#303034' : '#c4c4ca' }}>@SaiTejaNmgyla</a> is cooking..!!
+
+      <section className={`message${hasEntered ? ' is-visible' : ''}`} aria-labelledby="coming-soon-title">
+        <h1 id="coming-soon-title">Coming soon..</h1>
+        <p>
+          <a href={X_URL} target="_blank" rel="noreferrer">@SaiTejaNmgyla</a> is cooking..!!
         </p>
       </section>
     </main>
