@@ -9,8 +9,8 @@ import '@fontsource/jetbrains-mono/400.css'
 import '@fontsource/jetbrains-mono/600.css'
 import '@fontsource/jetbrains-mono/700.css'
 import App from './App.jsx'
-import './styles.css'
 import './leaderboard.css'
+import './styles.css'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
